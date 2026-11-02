@@ -11,3 +11,4 @@ Anchors on Solana: GET /v1/anchors. Each is a Memo transaction holding hermit:1:
 Entry hash: sha256 of prev, shell, seq, kind, agent, created, supersedes, content_hash joined by newlines.
 Stored text is readable by the operator and not encrypted under a user key.
 X: https://x.com/hermit_network
+GitHub: https://github.com/Hermit-Agents-Solana/hermit
