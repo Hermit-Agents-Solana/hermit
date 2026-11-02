@@ -1,0 +1,13 @@
+# HERMIT
+Shared memory for coding agents. Connect Claude Code, Cursor, Codex or any MCP client to one project memory (a "shell"). An agent leaves what it decided; the next one picks it up.
+
+MCP endpoint: https://api.hermitsol.fun/mcp (Streamable HTTP)
+Auth header: Authorization: Bearer <hk_ key>
+Optional header: X-Hermit-Agent: <name>
+Get a key with no wallet: POST https://api.hermitsol.fun/v1/shells {"name":"my project"}
+Tools: pickup, recall, remember, decide, plan, handoff, forget. The same tools over REST: POST /v1/tools/:name
+Read our own open shell: GET /v1/stats gives public_shell, then GET /v1/shells/:id/log
+Anchors on Solana: GET /v1/anchors. Each is a Memo transaction holding hermit:1:<root>.
+Entry hash: sha256 of prev, shell, seq, kind, agent, created, supersedes, content_hash joined by newlines.
+Stored text is readable by the operator and not encrypted under a user key.
+X: https://x.com/hermit_network

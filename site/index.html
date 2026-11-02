@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HERMIT · shared memory for coding agents</title>
+<meta name="description" content="One memory for Claude Code, Cursor, Codex and any MCP client. An agent leaves what it decided, the next one moves right in. Every write is chained and anchored on Solana.">
+<meta property="og:title" content="HERMIT: the next agent moves right in"><meta property="og:description" content="Shared memory for coding agents, with a log you can check on Solana."><meta property="og:image" content="https://hermitsol.fun/og-image.png"><meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="logo.png"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Figtree:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--teal:#0c4f4b;--deep:#0a2e2c;--mid:#14675f;--sand:#f7e8c9;--sand2:#efdcb5;--sand3:#e2cc9f;--coral:#ff5a36;--coral2:#d63f1e;--ink:#0a2e2c;--dim:#55705f}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--sand);color:var(--ink);font:400 17px/1.6 Figtree,sans-serif;overflow-x:hidden}
+h1,h2,h3{font-family:Unbounded,sans-serif;font-weight:900;margin:0;line-height:1.08}
+a{color:inherit}button{font:inherit;cursor:pointer}code,pre,.m{font-family:'JetBrains Mono',monospace}
+.wrap{display:grid;grid-template-columns:minmax(340px,38vw) 1fr;min-height:100vh}
+/* the fixed side: the shell itself */
+aside{position:sticky;top:0;height:100vh;background:var(--teal);color:var(--sand);padding:26px 30px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+.brand{display:flex;align-items:center;gap:12px;font:900 21px Unbounded,sans-serif;text-decoration:none}.brand img{width:40px;height:40px;border-radius:50%}
+#connect{margin-left:auto;background:none;border:2px solid var(--sand);color:var(--sand);padding:6px 12px;font:700 13px 'JetBrains Mono',monospace}
+#connect:hover{background:var(--sand);color:var(--teal)}
+h1{font-size:clamp(34px,3.7vw,58px);margin-top:6px}h1 em{font-style:normal;color:var(--coral)}
+.lead{margin:0;font-size:17px;max-width:32em}
+.spiral{flex:1;min-height:120px;position:relative;display:flex;align-items:center;justify-content:center}
+.spiral svg{height:100%;max-height:300px;width:auto;overflow:visible}
+.spiral path{fill:none;stroke-linecap:round;stroke-width:15}
+#trace{stroke:var(--mid)}#drawn{stroke:var(--sand)}
+.index{list-style:none;margin:0;padding:0;font:500 13px 'JetBrains Mono',monospace;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
+.index a{text-decoration:none;opacity:.72;display:block;padding:2px 0}.index a.on,.index a:hover{opacity:1;color:var(--coral)}
+.head{font:400 12px 'JetBrains Mono',monospace;border-top:1px solid var(--mid);padding-top:10px;opacity:.9;overflow-wrap:anywhere}
+/* the chambers */
+main{min-width:0}
+.chamber{padding:60px clamp(20px,5vw,72px);border-bottom:3px solid var(--sand3);max-width:980px}
+.no{font:700 13px 'JetBrains Mono',monospace;color:var(--coral2);margin-bottom:10px}
+h2{font-size:clamp(26px,3.2vw,40px);margin-bottom:16px}
+.chamber>p{max-width:40em;margin:0 0 14px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+.card{background:var(--sand2);padding:16px 18px;border-radius:4px 22px 4px 4px}.card b{display:block;font:700 15px Unbounded,sans-serif;margin-bottom:6px}.card p{margin:0;font-size:15.5px}
+.card.left{background:var(--teal);color:var(--sand)}
+.btn{background:var(--coral);color:var(--deep);border:0;padding:12px 20px;font:700 15px Figtree,sans-serif}
+.btn:hover{background:var(--coral2);color:#fff}.btn.alt{background:none;box-shadow:inset 0 0 0 2px var(--ink);color:var(--ink)}.btn.alt:hover{background:var(--ink);color:var(--sand)}
+.btn:disabled{opacity:.5;cursor:wait}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+input,select{font:400 15px Figtree,sans-serif;padding:12px 14px;border:2px solid var(--ink);background:#fff8e8;color:var(--ink);min-width:0;border-radius:0}
+.grow{flex:1 1 220px}
+.note{font-size:14.5px;color:var(--dim);margin:10px 0 0;max-width:40em}
+.err{color:var(--coral2);font-weight:700;font-size:15px;margin:10px 0 0}
+pre{background:var(--deep);color:var(--sand);padding:14px 16px;margin:0;font-size:13.5px;line-height:1.55;overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;position:relative}
+pre button{position:absolute;right:8px;top:8px;background:var(--mid);color:var(--sand);border:0;padding:2px 9px;font:500 12px 'JetBrains Mono',monospace}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-top:16px}.tabs button{background:var(--sand2);border:0;padding:7px 14px;font:700 13px 'JetBrains Mono',monospace;color:var(--ink)}.tabs button.on{background:var(--deep);color:var(--sand)}
+#keyBox{display:none;margin-top:18px}
+.keyline{background:var(--coral);color:var(--deep);padding:10px 14px;font:700 14px 'JetBrains Mono',monospace;overflow-wrap:anywhere}
+.try{margin-top:16px;display:grid;gap:8px}.answer{background:var(--sand2);padding:10px 14px;font-size:14.5px;overflow-wrap:anywhere;display:none;white-space:pre-wrap}
+/* the log, a coil of entries */
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}.filters button{background:none;border:2px solid var(--ink);padding:3px 11px;font:700 12px 'JetBrains Mono',monospace;color:var(--ink)}.filters button.on{background:var(--ink);color:var(--sand)}
+.entry{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--sand3)}
+.seq{font:700 13px 'JetBrains Mono',monospace;color:var(--dim);padding-top:2px}
+.tag{display:inline-block;font:700 11px 'JetBrains Mono',monospace;padding:1px 7px;background:var(--teal);color:var(--sand);margin-right:8px}
+.tag.decision{background:var(--coral);color:var(--deep)}.tag.handoff,.tag.plan{background:var(--deep)}.tag.constraint{background:var(--coral2);color:#fff}.tag.lesson{background:var(--mid)}.tag.forget{background:var(--sand3);color:var(--ink)}
+.who{font:400 12px 'JetBrains Mono',monospace;color:var(--dim)}
+.entry p{margin:6px 0 0;font-size:15.5px;white-space:pre-wrap;overflow-wrap:anywhere}.old p{text-decoration:line-through;opacity:.55}
+.hash{font:400 11.5px 'JetBrains Mono',monospace;color:var(--dim);overflow-wrap:anywhere;margin-top:4px}
+.ok{color:var(--mid)}.bad{color:var(--coral2)}
+#checkOut{background:var(--deep);color:var(--sand);padding:12px 16px;font:400 13.5px/1.7 'JetBrains Mono',monospace;display:none;margin-top:12px;overflow-wrap:anywhere}#checkOut a{color:var(--coral)}#checkOut .ok{color:#7fe0c4}#checkOut .bad{color:#ff8d73}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:15px;margin-top:10px}th{text-align:left;font:700 12px 'JetBrains Mono',monospace;color:var(--dim);padding:6px 12px 6px 0;border-bottom:2px solid var(--ink)}td{padding:9px 12px 9px 0;border-bottom:1px solid var(--sand3);vertical-align:top}td code{font-weight:700}
+.feed{font:400 13.5px 'JetBrains Mono',monospace}.feed div{padding:8px 0;border-top:1px solid var(--sand3);overflow-wrap:anywhere}.feed a{color:var(--coral2)}
+details{border-top:1px solid var(--sand3);padding:12px 0;max-width:44em}summary{cursor:pointer;font-weight:700}details p{margin:8px 0 0}
+#mine{display:none}.shell{background:var(--sand2);padding:14px 16px;margin-top:10px}.shell h3{font-size:16px;margin-bottom:6px}.shell .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.shell button{background:none;border:2px solid var(--ink);padding:3px 10px;font:700 12px 'JetBrains Mono',monospace;color:var(--ink)}
+footer{padding:30px clamp(20px,5vw,72px) 50px;font-size:14px;color:var(--dim)}
+@media(max-width:900px){.wrap{display:block}aside{position:static;height:auto;padding:18px 16px 24px}.spiral,.index,.head{display:none}.pair{grid-template-columns:1fr}.chamber{padding:42px 16px}h1{font-size:34px}}
+</style></head><body>
+<div class="wrap">
+<aside>
+  <div class="row"><a class="brand" href="#top"><img src="logo.png" alt="">HERMIT</a><button id="connect">Connect</button></div>
+  <h1>The next agent <em>moves right in</em></h1>
+  <p class="lead">One memory for Claude Code, Cursor, Codex and any MCP client. An agent leaves what it decided. The next one picks it up and keeps going.</p>
+  <div class="spiral"><svg viewBox="0 0 240 240" aria-hidden="true"><path id="trace"/><path id="drawn"/></svg></div>
+  <ul class="index" id="index">
+    <li><a href="#top">Why</a></li><li><a href="#movein">Move in</a></li><li><a href="#shell">Our shell</a></li><li><a href="#tools">Tools</a></li>
+    <li><a href="#chain">On Solana</a></li><li><a href="#safe">What stays out</a></li><li><a href="#token">$HERMIT</a></li><li><a href="#faq">Questions</a></li>
+  </ul>
+  <div class="head" id="tick">reading the chain…</div>
+</aside>
+<main id="top">
+  <section class="chamber"><div class="no">CHAMBER 1</div><h2>Every new session starts homeless</h2>
+    <p>Your agent spends an hour learning why the code is the way it is. Then the session ends. The next one, or the other tool you use, starts from nothing and you explain it all again. Or it undoes something that was decided on purpose.</p>
+    <p>Each vendor built memory for its own agent, inside its own product. None of them will hand your work to a competitor. So you carry it by hand. HERMIT sits between them.</p>
+    <div class="pair"><div class="card left"><b>Leaving</b><p>Before it finishes, the agent writes down what it decided, what it learned and what is left. Conclusions, not the transcript.</p></div><div class="card"><b>Moving in</b><p>The next agent opens the same shell and calls <code>pickup</code>. It gets the last handoff, the plan, and the decisions that still stand.</p></div></div>
+  </section>
+
+  <section class="chamber" id="movein"><div class="no">CHAMBER 2</div><h2>Move in</h2>
+    <p>A shell is one project's memory. Make one now, no wallet and no sign-up. Connect a wallet later to keep it and raise the limits.</p>
+    <form class="row" id="newShell"><input class="grow" id="shellName" maxlength="40" placeholder="Project name" aria-label="Project name"><button class="btn" id="newBtn">Make a shell</button></form>
+    <p class="err" id="newErr" role="alert"></p>
+    <div id="keyBox">
+      <div class="keyline" id="keyLine"></div>
+      <p class="note">This key is shown once. Anyone holding it can read and write this shell.</p>
+      <div class="tabs" id="tabs"><button class="on" data-c="claude">Claude Code</button><button data-c="cursor">Cursor</button><button data-c="codex">Codex</button><button data-c="other">Any MCP client</button></div>
+      <pre id="setup"></pre>
+      <p class="note">Add this line to your CLAUDE.md or AGENTS.md so it happens every time:</p>
+      <pre id="rule">Call hermit pickup when you start and hermit handoff before you finish.</pre>
+      <div class="try"><b>Try it here</b><div class="row"><input class="grow" id="tryText" placeholder="Write something for the next agent" aria-label="Note"><button class="btn alt" id="tryWrite" type="button">Remember</button></div><div class="row"><input class="grow" id="tryQuery" placeholder="Ask in other words" aria-label="Search"><button class="btn alt" id="tryRecall" type="button">Recall</button></div><div class="answer m" id="tryOut"></div></div>
+    </div>
+    <div id="mine"><h3 style="margin-top:30px;font-size:20px">Your shells</h3><div id="mineList"></div>
+      <div class="row" style="margin-top:12px"><input class="grow" id="claimKey" placeholder="hk_ key of a shell you made without a wallet" aria-label="Key"><button class="btn alt" id="claimBtn" type="button">Claim it</button></div><p class="err" id="mineErr" role="alert"></p></div>
+  </section>
+
+  <section class="chamber" id="shell"><div class="no">CHAMBER 3</div><h2>Our own shell, open</h2>
+    <p>The agent that built HERMIT kept its memory in HERMIT. This is that log, nothing staged and nothing edited. Read it, then check it: your browser recomputes every hash from the text on this page.</p>
+    <div class="row"><button class="btn" id="checkBtn">Check the chain</button><span class="note m" id="logMeta" style="margin:0"></span></div>
+    <div id="checkOut" role="status"></div>
+    <div class="filters" id="filters"></div>
+    <div id="log"></div>
+  </section>
+
+  <section class="chamber" id="tools"><div class="no">CHAMBER 4</div><h2>Seven tools</h2>
+    <p>Your agent is already a model, so nothing here runs a second one to summarize your work. It writes its own conclusions. Search works by meaning in any language and by exact words such as a file name.</p>
+    <div class="scroll"><table><tr><th>TOOL</th><th>WHAT IT DOES</th></tr>
+      <tr><td><code>pickup</code></td><td>Start here. The last handoff, the plan and everything that still stands.</td></tr>
+      <tr><td><code>recall</code></td><td>Search what the project knows. Replaced entries never come back.</td></tr>
+      <tr><td><code>remember</code></td><td>Store a fact, a constraint or a lesson.</td></tr>
+      <tr><td><code>decide</code></td><td>Record a decision and its reason, so nobody argues it again.</td></tr>
+      <tr><td><code>plan</code></td><td>Set the current plan. It replaces the last one.</td></tr>
+      <tr><td><code>handoff</code></td><td>What you did, what is left, what the next agent must know.</td></tr>
+      <tr><td><code>forget</code></td><td>Clear an entry that is wrong or stale. The text goes, the hash stays.</td></tr>
+    </table></div>
+    <p class="note">If a new write says nearly the same as an older one, HERMIT shows the agent both, so it can replace the old one instead of leaving two truths.</p>
+  </section>
+
+  <section class="chamber" id="chain"><div class="no">CHAMBER 5</div><h2>A log nobody can rewrite quietly</h2>
+    <p>Shared memory is only useful if you can trust it, and an agent will believe whatever it reads. Every write links to the hash of the one before. Every hour the heads of all changed logs are hashed into one root, and that root goes on Solana in a Memo transaction.</p>
+    <p>After that, changing an old entry breaks the chain, and the root on Solana shows it. That includes changes by us.</p>
+    <p class="note">What this proves: the log existed in this form by that time. What it does not prove: that what an agent wrote is true. Entries newer than the last anchor are not covered yet.</p>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <section class="chamber" id="safe"><div class="no">CHAMBER 6</div><h2>What stays out</h2>
+    <p>Agents paste things they should not. Every write is cleaned before it is stored, and the agent is told what was removed.</p>
+    <div class="pair"><div class="card"><b>Removed on sight</b><p>API keys, tokens, passwords, private key files, logins in URLs, email addresses, Solana keypairs and seed phrases.</p></div><div class="card"><b>Left alone</b><p>Wallet addresses, mints and transaction signatures. Keypairs are checked by their math, so a signature is not mistaken for one.</p></div></div>
+    <p class="note" style="margin-top:14px">This is pattern matching. It catches the usual shapes of a secret, not every secret. Do not rely on it to store something you would not put in a ticket.</p>
+  </section>
+
+  <section class="chamber" id="token"><div class="no">CHAMBER 7</div><h2>$HERMIT</h2>
+    <p id="tokenLine">The memory is free to use. Holding $HERMIT in the wallet that owns a shell raises its limits. There is no token yet: any contract you see now is not ours.</p>
+    <div class="scroll"><table id="tiers"></table></div>
+    <p class="note">A drifter is a shell made without a wallet. Holdings are read on chain each time, nothing is locked and nothing is spent.</p>
+  </section>
+
+  <section class="chamber" id="faq"><div class="no">CHAMBER 8</div><h2>Questions</h2>
+    <details><summary>Can you read what my agents store?</summary><p>Yes. Text is kept readable on our servers so that search works, and it is not encrypted under a key of yours. Your key opens your shell and nobody else's, and the log is private unless you open it.</p></details>
+    <details><summary>Will my agent use it on its own?</summary><p>When it connects, HERMIT tells the agent to call pickup first and handoff last. An agent can still skip it, so add one line to CLAUDE.md or AGENTS.md as well.</p></details>
+    <details><summary>Do I need a wallet or the token?</summary><p>No. A shell without a wallet works today, up to 500 memories. A wallet gives you more, and the token more again.</p></details>
+    <details><summary>Can my team share a shell?</summary><p>Yes. The owner issues one key per person or tool. Writes are signed with the name of the agent that made them, and a key can be revoked alone.</p></details>
+    <details><summary>Can I delete things?</summary><p>Forget clears one entry. Deleting a shell removes all of it. Only hashes stay on Solana, and they say nothing about the text.</p></details>
+    <details><summary>Could a stored memory attack my agent?</summary><p>Anything an agent reads can steer it, and that goes for this too. HERMIT tells agents to treat entries as notes to weigh, not instructions. Only give keys to people you trust.</p></details>
+    <details><summary>Why Solana?</summary><p>An anchor costs a fraction of a cent, so the whole log can go on chain every hour. And your wallet is the account: no email, no password.</p></details>
+  </section>
+  <footer>HERMIT stores what your agents give it. It is not financial advice. <a href="https://x.com/hermit_network" target="_blank" rel="noopener">X ↗</a> <span id="stats"></span></footer>
+</main>
+</div>
+<script>
+(() => {
+  const API = 'https://api.hermitsol.fun';
+  const SOL_RPC = 'https://solana-rpc.publicnode.com'; // answers browsers, the Solana Foundation RPC returns 403
+  const GENESIS = '0'.repeat(64);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const short = (a) => `${a.slice(0, 6)}…${a.slice(-6)}`;
+  const day = (t) => new Date(t).toISOString().slice(0, 16).replace('T', ' ');
+  const netErr = (e) => (e.message === 'Failed to fetch' ? 'The API is out of reach, try again in a moment.' : e.message);
+  let session = null, wallet = null, shellKey = null, entries = [], publicId = null, filter = 'all';
+  try { session = sessionStorage.getItem('hermit_session'); wallet = sessionStorage.getItem('hermit_wallet'); } catch {}
+
+  const req = async (path, opts = {}, auth = session) => {
+    const r = await fetch(API + path, { ...opts, headers: { 'content-type': 'application/json', ...(auth ? { authorization: `Bearer ${auth}` } : {}) } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'that failed');
+    return j;
+  };
+  const post = (path, body, auth) => req(path, { method: 'POST', body: JSON.stringify(body) }, auth);
+
+  // ---------- the spiral fills as you read ----------
+  const points = (() => { let d = ''; const n = 160; for (let i = 0; i <= n; i++) { const k = i / n, a = k * 3.1 * Math.PI * 2 + 1, r = 6 + 106 * k; d += `${i ? 'L' : 'M'}${(120 + Math.cos(a) * r).toFixed(1)} ${(120 + Math.sin(a) * r).toFixed(1)} `; } return d; })();
+  $('trace').setAttribute('d', points); $('drawn').setAttribute('d', points);
+  const len = $('drawn').getTotalLength();
+  $('drawn').style.strokeDasharray = len;
+  const links = [...$('index').querySelectorAll('a')];
+  const spots = links.map((a) => document.querySelector(a.getAttribute('href')));
+  const onScroll = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    $('drawn').style.strokeDashoffset = len * (1 - (max > 0 ? Math.min(scrollY / max, 1) : 0));
+    let at = 0; spots.forEach((s, i) => { if (s.getBoundingClientRect().top < innerHeight * 0.4) at = i; });
+    links.forEach((a, i) => a.classList.toggle('on', i === at));
+  };
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  // ---------- moving in ----------
+  const setups = (k) => ({
+    claude: `claude mcp add --transport http hermit ${API}/mcp \\\n  --header "Authorization: Bearer ${k}" \\\n  --header "X-Hermit-Agent: claude-code"`,
+    cursor: `// .cursor/mcp.json\n${JSON.stringify({ mcpServers: { hermit: { url: `${API}/mcp`, headers: { Authorization: `Bearer ${k}`, 'X-Hermit-Agent': 'cursor' } } } }, null, 2)}`,
+    codex: `export HERMIT_KEY=${k}\ncodex mcp add hermit --url ${API}/mcp --bearer-token-env-var HERMIT_KEY`,
+    other: `endpoint  ${API}/mcp  (Streamable HTTP)\nheader    Authorization: Bearer ${k}\nheader    X-Hermit-Agent: <a name for this agent>  (optional)`,
+  });
+  const copyable = (pre) => { const text = pre.textContent; const b = document.createElement('button'); b.type = 'button'; b.textContent = 'copy'; b.onclick = () => { navigator.clipboard?.writeText(text); b.textContent = 'copied'; }; pre.append(b); };
+  const showSetup = (c) => { $('setup').textContent = setups(shellKey)[c]; copyable($('setup')); [...$('tabs').children].forEach((b) => b.classList.toggle('on', b.dataset.c === c)); };
+  $('tabs').onclick = (e) => { if (e.target.dataset.c) showSetup(e.target.dataset.c); };
+  copyable($('rule'));
+  const showKey = (r) => { shellKey = r.key; $('keyLine').textContent = r.key; $('keyBox').style.display = 'block'; showSetup('claude'); };
+  $('newShell').onsubmit = async (e) => {
+    e.preventDefault(); $('newErr').textContent = ''; $('newBtn').disabled = true;
+    try { showKey(await post('/v1/shells', { name: $('shellName').value })); if (session) mine(); loadStats(); } catch (x) { $('newErr').textContent = netErr(x); }
+    $('newBtn').disabled = false;
+  };
+  const say = (t) => { $('tryOut').style.display = 'block'; $('tryOut').textContent = t; };
+  $('tryWrite').onclick = async () => {
+    try {
+      const r = await post('/v1/tools/remember', { text: $('tryText').value }, shellKey);
+      say(`Stored as entry ${r.id}${r.redacted ? `. Removed before storing: ${r.redacted.join(', ')}` : ''}\nhash ${r.hash}`);
+      $('tryText').value = '';
+    } catch (x) { say(netErr(x)); }
+  };
+  $('tryRecall').onclick = async () => {
+    try {
+      const r = await post('/v1/tools/recall', { query: $('tryQuery').value }, shellKey);
+      say(r.memories.length ? r.memories.map((m) => `#${m.id} ${m.kind}: ${m.text}`).join('\n') : 'Nothing yet. A note can take a few seconds to show up in search by meaning.');
+    } catch (x) { say(netErr(x)); }
+  };
+
+  // ---------- the open shell ----------
+  const sha256 = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const drawLog = () => {
+    const kinds = ['all', ...new Set(entries.map((e) => e.kind))];
+    $('filters').innerHTML = kinds.map((k) => `<button class="${k === filter ? 'on' : ''}" data-k="${esc(k)}">${esc(k)}</button>`).join('');
+    const shown = entries.filter((e) => filter === 'all' || e.kind === filter).slice().reverse();
+    $('log').innerHTML = shown.map((e) => `<div class="entry ${e.superseded_by ? 'old' : ''}"><div class="seq">#${e.seq}</div><div><span class="tag ${esc(e.kind)}">${esc(e.kind)}</span><span class="who">${esc(e.agent)} · ${day(e.created)}${e.superseded_by ? ` · replaced by #${e.superseded_by}` : ''}</span><p>${e.text === null ? '<i>forgotten, hash kept</i>' : esc(e.text)}</p><div class="hash" id="h${e.seq}">${e.hash}</div></div></div>`).join('') || '<p class="note">The log is empty.</p>';
+  };
+  $('filters').onclick = (e) => { if (e.target.dataset.k) { filter = e.target.dataset.k; drawLog(); } };
+  async function loadLog() {
+    if (!publicId) return;
+    entries = [];
+    for (let after = 0; ;) {
+      const j = await req(`/v1/shells/${publicId}/log?after=${after}&limit=500`, {}, null);
+      entries.push(...j.entries);
+      $('logMeta').textContent = `${j.shell.entries} entries · ${j.shell.anchored} anchored`;
+      if (j.entries.length < 500) break;
+      after = j.entries.at(-1).seq;
+    }
+    drawLog();
+  }
+  // the memo as Solana itself reports it, without going through our API
+  async function memoOnChain(sig) {
+    const r = await fetch(SOL_RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [sig, { encoding: 'json', maxSupportedTransactionVersion: 1, commitment: 'confirmed' }] }) });
+    const j = await r.json();
+    return (j.result?.meta?.logMessages || []).join(' ').match(/hermit:1:([0-9a-f]{64})/)?.[1] || null;
+  }
+  $('checkBtn').onclick = async () => {
+    const out = $('checkOut'); out.style.display = 'block'; out.innerHTML = 'Recomputing…';
+    const lines = [];
+    const line = (ok, t) => lines.push(`<span class="${ok ? 'ok' : 'bad'}">${ok ? 'OK ' : 'NO '}</span>${t}`);
+    try {
+      await loadLog();
+      let prev = GENESIS, broken = null, cleared = 0;
+      for (const e of entries) {
+        const hash = await sha256([prev, publicId, e.seq, e.kind, e.agent, e.created, e.supersedes ?? '', e.content_hash].join('\n'));
+        const textOk = e.text === null || (await sha256(e.text)) === e.content_hash;
+        if (e.text === null) cleared++;
+        if (hash !== e.hash || e.prev !== prev || !textOk) { broken = e.seq; break; }
+        prev = e.hash;
+      }
+      line(!broken, broken ? `the chain breaks at entry ${broken}` : `${entries.length} entries link up, every hash recomputed in your browser${cleared ? `, ${cleared} forgotten` : ''}`);
+      const { anchors } = await req(`/v1/shells/${publicId}/anchors`, {}, null);
+      if (!anchors.length) lines.push('No anchor covers this shell yet.');
+      for (const a of anchors.slice(0, 3)) {
+        const d = await req(`/v1/anchors/${a.id}`, {}, null);
+        const inLog = entries[a.seq - 1]?.hash === a.head;
+        const leaf = `${await sha256(publicId)}:${a.seq}:${a.head}`;
+        const rootOk = d.leaves.includes(leaf) && (await sha256([...d.leaves].sort().join('\n'))) === d.root;
+        line(inLog && rootOk, `anchor ${a.id} covers entry ${a.seq} and its root rebuilds from ${d.leaves.length} leaves`);
+        const link = `<a href="https://solscan.io/tx/${esc(a.signature)}" target="_blank" rel="noopener">${short(a.signature)} ↗</a>`;
+        let chain = null; try { chain = await memoOnChain(a.signature); } catch {}
+        if (chain) line(chain === d.root, `the memo on Solana matches: ${link}`);
+        else lines.push(`Solana did not answer this browser. Compare it by hand: ${d.root.slice(0, 12)}… in ${link}`);
+      }
+      const after = anchors[0] ? entries.length - anchors[0].seq : entries.length;
+      if (anchors[0] && after > 0) lines.push(`${after} newer entries wait for the next anchor.`);
+    } catch (x) { lines.push(`<span class="bad">${esc(netErr(x))}</span>`); }
+    out.innerHTML = lines.join('<br>');
+  };
+
+  // ---------- stats, anchors, tiers ----------
+  async function loadStats() {
+    try {
+      const j = await req('/v1/stats', {}, null);
+      publicId = j.public_shell;
+      $('stats').textContent = `${j.shells} shell${j.shells === 1 ? '' : 's'}, ${j.entries} entries, ${j.anchors} anchor${j.anchors === 1 ? '' : 's'} so far, ours included.`;
+      if (j.token) $('tokenLine').innerHTML = `The memory is free to use. Holding $HERMIT in the wallet that owns a shell raises its limits.<br><code style="overflow-wrap:anywhere">${esc(j.token)}</code> <a href="https://pump.fun/coin/${esc(j.token)}" target="_blank" rel="noopener">Buy</a>`;
+      const t = j.tiers, rows = [['drifter', t.drifter], ['free', t.free], ['holder', t.holder], ['elder', t.elder]];
+      $('tiers').innerHTML = `<tr><th>TIER</th><th>HOLD</th><th>SHELLS</th><th>MEMORIES</th><th>KEYS</th><th>WRITES A DAY</th></tr>${rows.map(([n, x]) => `<tr><td><b>${n}</b></td><td>${x.min ? `${x.min.toLocaleString('en-US')} $HERMIT` : n === 'free' ? 'a wallet' : 'nothing'}</td><td>${x.shells || '10 new a day'}</td><td>${x.memories.toLocaleString('en-US')}</td><td>${x.keys}</td><td>${x.writes.toLocaleString('en-US')}</td></tr>`).join('')}`;
+      const { anchors } = await req('/v1/anchors', {}, null);
+      $('tick').textContent = anchors[0] ? `last anchor ${day(anchors[0].created)} UTC · root ${anchors[0].root.slice(0, 16)}…` : `no anchors yet · paid by ${short(j.anchor_wallet || 'unset')}`;
+      $('feed').innerHTML = anchors.length ? anchors.slice(0, 12).map((a) => `<div>${day(a.created)} · ${a.entries} shell${a.entries === 1 ? '' : 's'} · <a href="https://solscan.io/tx/${esc(a.signature)}" target="_blank" rel="noopener">${short(a.signature)} ↗</a><br>root ${esc(a.root)}${a.status === 'pending' ? ' · confirming' : ''}</div>`).join('') : `<div>No anchors yet. The first one will show up here. Anchor wallet: ${esc(j.anchor_wallet || 'unset')}</div>`;
+    } catch {}
+  }
+
+  // ---------- wallet ----------
+  async function mine() {
+    if (!session) return;
+    try {
+      const { shells } = await req('/v1/shells');
+      $('mine').style.display = 'block';
+      $('mineList').innerHTML = shells.map((s) => `<div class="shell" data-id="${esc(s.id)}"><h3>${esc(s.name)}</h3><div class="who">${s.entries} entries · ${s.anchored} anchored · ${s.public ? 'open to all' : 'private'} · ${esc(s.id)}</div><div class="acts"><button data-a="key">New key</button><button data-a="public" data-v="${s.public ? 0 : 1}">${s.public ? 'Make private' : 'Open to all'}</button><button data-a="delete">Delete</button></div></div>`).join('') || '<p class="note">None yet. Make one above and it is yours.</p>';
+    } catch (x) { if (/session/.test(x.message)) { session = null; try { sessionStorage.clear(); } catch {} } $('connect').textContent = 'Connect'; }
+  }
+  $('mineList').onclick = async (e) => {
+    const a = e.target.dataset.a, id = e.target.closest('.shell')?.dataset.id;
+    if (!a) return;
+    $('mineErr').textContent = '';
+    try {
+      if (a === 'key') { showKey(await post(`/v1/shells/${id}/keys`, {})); $('keyBox').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      if (a === 'public') await post(`/v1/shells/${id}/public`, { public: e.target.dataset.v === '1' });
+      if (a === 'delete') { if (!confirm('Delete this shell and all its memories? This cannot be undone.')) return; await req(`/v1/shells/${id}`, { method: 'DELETE' }); }
+      mine();
+    } catch (x) { $('mineErr').textContent = netErr(x); }
+  };
+  $('claimBtn').onclick = async () => {
+    $('mineErr').textContent = '';
+    const key = $('claimKey').value.trim();
+    try {
+      // a key opens exactly one shell, so ask the API which one before claiming it
+      const { shell } = await post('/v1/tools/whoami', {}, key);
+      await post(`/v1/shells/${shell}/claim`, { key });
+      $('claimKey').value = ''; mine();
+    } catch (x) { $('mineErr').textContent = netErr(x); }
+  };
+  async function connect() {
+    const p = window.phantom?.solana || window.solana;
+    if (!p) { $('newErr').textContent = 'No Solana wallet found in this browser.'; return; }
+    try {
+      const { publicKey } = await p.connect();
+      const address = publicKey.toString();
+      const message = `HERMIT sign-in\nWallet: ${address}\nTime: ${new Date().toISOString()}`;
+      const { signature } = await p.signMessage(new TextEncoder().encode(message), 'utf8');
+      const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      let n = 0n; for (const b of signature) n = n * 256n + BigInt(b);
+      let s = ''; while (n > 0n) { s = A[Number(n % 58n)] + s; n /= 58n; }
+      for (const b of signature) { if (b) break; s = '1' + s; }
+      const j = await post('/v1/auth', { address, message, signature: s }, null);
+      session = j.session; wallet = address;
+      try { sessionStorage.setItem('hermit_session', session); sessionStorage.setItem('hermit_wallet', wallet); } catch {}
+      $('connect').textContent = `${address.slice(0, 4)}…${address.slice(-4)}`;
+      await mine();
+      $('mine').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) { $('newErr').textContent = e.message || 'Connect failed'; }
+  }
+  $('connect').onclick = connect;
+  if (session && wallet) { $('connect').textContent = `${wallet.slice(0, 4)}…${wallet.slice(-4)}`; mine(); }
+  loadStats().then(loadLog).catch(() => {});
+})();
+</script></body></html>

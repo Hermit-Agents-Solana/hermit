@@ -1,0 +1,39 @@
+name = "hermit-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = true
+
+# Create with `npx wrangler d1 create hermit` and paste the database_id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "hermit"
+database_id = "paste-your-d1-id"
+
+# Create with `npx wrangler vectorize create hermit --dimensions=1024 --metric=cosine`.
+[[vectorize]]
+binding = "VECTORS"
+index_name = "hermit"
+
+[ai]
+binding = "AI"
+
+# Search index retries and Solana anchors.
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+# Tiers by $HERMIT held (all off until TOKEN_ADDRESS is set: everyone is "free").
+HOLD_HOLDER = "1000000"
+HOLD_ELDER = "5000000"
+# Minutes between anchors while something changed.
+ANCHOR_EVERY_MIN = "60"
+# The open shell the site shows to everyone.
+PUBLIC_SHELL = ""
+# $HERMIT mint after launch: turns on tiers.
+TOKEN_ADDRESS = ""
+SITE_URL = ""
+# Secrets (not here):
+#   npx wrangler secret put SOL_RPC_URL     (Helius mainnet URL)
+#   npx wrangler secret put ANCHOR_KEY      (hex seed of the wallet that pays for anchors)
